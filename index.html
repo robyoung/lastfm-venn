@@ -1,0 +1,133 @@
+<html>
+<head>
+  <script type="application/javascript" src="http://code.jquery.com/jquery-2.0.3.min.js"></script>
+  <script type="application/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/d3/3.2.2/d3.v3.min.js"></script>
+  <script type="application/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/1.3.1/lodash.min.js"></script>
+  <script type="application/javascript" src="./venn.js"></script>
+
+  <script type="application/javascript">
+
+    function getParameter(param, location) {
+      var pattern = new RegExp("(?:\\?|&)" + param + "=(.*?)(?:&|$)");
+      var result = pattern.exec(location);
+      if (result !== null) {
+        return result[1];
+      }
+      return null;
+    }
+
+    function getTopArtists(apiKey, users, callback) {
+      console.log("getTopArtists");
+      var data = {};
+      _.each(users, function(user) {
+        data[user] = null;
+        doGetTopArtists(apiKey, data, user, callback);
+      })
+    }
+
+    function doGetTopArtists(apiKey, data, user, callback) {
+      console.log("doGetTopArtists");
+      _getTopArtists(apiKey, user, function(artists) {
+        data[user] = artists;
+        if (_.map(data).reduce(function(l, r) { return l !== null && r !== null; })) {
+          callback(data);
+        }
+      });
+    }
+
+    function _getTopArtists(apiKey, user, callback, page, artists) {
+      artists = artists || [];
+      page = page || 1;
+      console.log(user, page);
+      $.ajax(createTopArtistsUrl(apiKey, user, page)).done(function(data) {
+        var someArtists = data.topartists.artist.map(function(artist) { return artist.url; });
+        artists = artists.concat(someArtists);
+        var page = parseInt(data.topartists['@attr'].page),
+            totalPages = parseInt(data.topartists['@attr'].totalPages);
+
+        if (page < Math.min(totalPages, 3)) {
+          page += 1;
+          _getTopArtists(apiKey, user, callback, page, artists);
+        } else {
+          callback(artists);
+        }
+      });
+    }
+
+    function createTopArtistsUrl(apiKey, user, page) {
+      if (page === null) {
+        page = 1;
+      }
+      var tpl = "http://ws.audioscrobbler.com/2.0/?method=user.gettopartists&user={user}&api_key={apiKey}&format=json&page={page}";
+      return tpl.replace("{user}", user)
+                .replace("{apiKey}", apiKey)
+                .replace("{page}", page);
+    }
+
+    function Set(data) {
+      this.data = {};
+      for (var i = 0; i < data.length; i++) {
+        this.data[data[i]] = true;
+      }
+    }
+
+    Set.prototype.values = function() {
+      return _.keys(this.data);
+    };
+
+    Set.prototype.size = function() {
+      return this.values().length;
+    };
+
+    Set.prototype.intersection = function(other) {
+      return new Set(_.filter(this.values(), function(artist) { return other.data[artist]; }));
+    };
+
+
+    function createVenn(data) {
+      console.log(data);
+      var sets = _.keys(data).map(function(user) {
+        return {label: user, size: data[user].length};
+      });
+      var overlaps = [];
+
+      var users = _.keys(data);
+      var intersection = null;
+      for (var i = 0; i < users.length - 1; i++) {
+        for (var j = i + 1; j < users.length; j++) {
+          intersection = _.intersection(data[users[i]], data[users[j]]);
+          overlaps.push({
+            sets: [i, j], size: intersection.length 
+          });
+          console.log(users[i], users[j], intersection);
+        }
+      }
+      console.log(sets);
+      console.log(overlaps);
+      sets = venn.venn(sets, overlaps);
+      venn.drawD3Diagram(d3.select("#my-venn"), sets, 300, 300);
+    }
+
+    $(document).ready(function() {
+      var users = [],
+          user = null,
+          apiKey = getParameter("api_key", window.location);
+
+      for (var i = 1; true; i++) {
+        user = getParameter("user" + i, window.location);
+        if (!user) {
+          break;
+        }
+        users.push(user);
+
+      }
+
+      getTopArtists(apiKey, users, createVenn);
+    });
+
+  </script>
+</head>
+<body>
+<div id="my-venn"></div>
+</body>
+</html>
