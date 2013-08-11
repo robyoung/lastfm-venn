@@ -20,16 +20,12 @@
       var data = {};
       _.each(users, function(user) {
         data[user] = null;
-        getTopArtistsForUser(apiKey, data, user, callback);
-      })
-    }
-
-    function getTopArtistsForUser(apiKey, data, user, callback) {
-      getPageOfTopArtistsForUser(apiKey, user, function(artists) {
-        data[user] = artists;
-        if (_.map(data).reduce(function(l, r) { return l !== null && r !== null; })) {
-          callback(data);
-        }
+        getPageOfTopArtistsForUser(apiKey, user, function(artists) {
+          data[user] = artists;
+          if (_.all(_.map(data, function(d) { return d !== null; }))) {
+            callback(data);
+          }
+        });
       });
     }
 
