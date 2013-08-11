@@ -17,17 +17,15 @@
     }
 
     function getTopArtists(apiKey, users, callback) {
-      console.log("getTopArtists");
       var data = {};
       _.each(users, function(user) {
         data[user] = null;
-        doGetTopArtists(apiKey, data, user, callback);
+        getTopArtistsForUser(apiKey, data, user, callback);
       })
     }
 
-    function doGetTopArtists(apiKey, data, user, callback) {
-      console.log("doGetTopArtists");
-      _getTopArtists(apiKey, user, function(artists) {
+    function getTopArtistsForUser(apiKey, data, user, callback) {
+      getPageOfTopArtistsForUser(apiKey, user, function(artists) {
         data[user] = artists;
         if (_.map(data).reduce(function(l, r) { return l !== null && r !== null; })) {
           callback(data);
@@ -35,10 +33,9 @@
       });
     }
 
-    function _getTopArtists(apiKey, user, callback, page, artists) {
+    function getPageOfTopArtistsForUser(apiKey, user, callback, page, artists) {
       artists = artists || [];
       page = page || 1;
-      console.log(user, page);
       $.ajax(createTopArtistsUrl(apiKey, user, page)).done(function(data) {
         var someArtists = data.topartists.artist.map(function(artist) { return artist.url; });
         artists = artists.concat(someArtists);
@@ -47,7 +44,7 @@
 
         if (page < Math.min(totalPages, 3)) {
           page += 1;
-          _getTopArtists(apiKey, user, callback, page, artists);
+          getPageOfTopArtistsForUser(apiKey, user, callback, page, artists);
         } else {
           callback(artists);
         }
@@ -64,28 +61,7 @@
                 .replace("{page}", page);
     }
 
-    function Set(data) {
-      this.data = {};
-      for (var i = 0; i < data.length; i++) {
-        this.data[data[i]] = true;
-      }
-    }
-
-    Set.prototype.values = function() {
-      return _.keys(this.data);
-    };
-
-    Set.prototype.size = function() {
-      return this.values().length;
-    };
-
-    Set.prototype.intersection = function(other) {
-      return new Set(_.filter(this.values(), function(artist) { return other.data[artist]; }));
-    };
-
-
     function createVenn(data) {
-      console.log(data);
       var sets = _.keys(data).map(function(user) {
         return {label: user, size: data[user].length};
       });
@@ -99,11 +75,8 @@
           overlaps.push({
             sets: [i, j], size: intersection.length 
           });
-          console.log(users[i], users[j], intersection);
         }
       }
-      console.log(sets);
-      console.log(overlaps);
       sets = venn.venn(sets, overlaps);
       venn.drawD3Diagram(d3.select("#my-venn"), sets, 300, 300);
     }
